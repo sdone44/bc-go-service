@@ -22,6 +22,10 @@ CONTRACT_ABI=''
 CONTRACT_METHOD_SHARADATE=
 ```
 
+### 安装MariaDB数据库：
+```
+docker-compose up -d
+```
 
 ### 运行：
 ```
