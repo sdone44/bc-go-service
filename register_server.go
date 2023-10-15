@@ -36,6 +36,7 @@ var (
 	dbPort                   string
 	dbHost                   string
 	rpcUrl                   string
+	accountTaskStatus        string
 )
 
 type Input struct {
@@ -149,7 +150,10 @@ func initBlockTask() {
 	executeRequestTaskStatus = false
 	// 启动异步任务
 	go executeRequestTask()
-	go executeAccountTask()
+	if accountTaskStatus == "on" {
+		go executeAccountTask()
+	}
+
 }
 
 func initEnvConfig() {
@@ -168,6 +172,7 @@ func initEnvConfig() {
 	abiStr = os.Getenv("CONTRACT_ABI")
 	contractAddress = os.Getenv("CONTRACT_ADDRESS")
 	contractMethodId = os.Getenv("CONTRACT_METHOD_SHARADATE")
+	accountTaskStatus = os.Getenv("ACCOUNT_TASK_STATUS")
 	if port == "" {
 		port = "5924" // 当未在 .env 文件中指定 PORT 时，默认使用 5000
 	}
