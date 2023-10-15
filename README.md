@@ -1,6 +1,7 @@
 ### 编译：
 ````
 go build -o bc_server register_server.go
+go build -o bc_server_amd register_server.go
 ````
 
 
@@ -30,11 +31,15 @@ docker-compose up -d
 ### 运行：
 ```
 chmod +x ./bc_server
-nohup ./bc_server > bc_service.log 2>&1 & echo $! > pidfile
+nohup ./bc_server > service.log &
+```
+
+### 查看：
+```
+ps -ef | grep "bc_server"
 ```
 
 ### 停止：
 ```
-ps -ef | grep "bc_server"
-kill $(cat pidfile)
+ps -ef | grep "bc_server" | grep -v grep | awk '{ print $2 }' | xargs kill -9
 ```
