@@ -127,10 +127,8 @@ type SQL struct {
 func main() {
 	initEnvConfig()
 	initDB()
-	// inttBlockTask()
-	// initListen()
-	synAccountTask()
-
+	initBlockTask()
+	initListen()
 }
 
 func initListen() {
@@ -146,10 +144,12 @@ func initListen() {
 
 }
 
-func inttBlockTask() {
+func initBlockTask() {
 	fmt.Printf("加载区块同步任务...\n")
 	executeRequestTaskStatus = false
-	go executeRequestTask() // 启动异步任务
+	// 启动异步任务
+	go executeRequestTask()
+	go executeAccountTask()
 }
 
 func initEnvConfig() {
@@ -251,7 +251,7 @@ func (s *SQL) migrate() {
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf("创建表[%v]成功\n", tableName_2)
+	fmt.Printf("加载表[%v]成功\n", tableName_2)
 
 	tableName_3 := dbTablePrefix + "block_account"
 	tableSql_3 := fmt.Sprintf(`
@@ -269,13 +269,13 @@ func (s *SQL) migrate() {
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Println("数据库加载成功！\n")
+	fmt.Printf("加载表[%v]成功\n", tableName_3)
+	fmt.Println("数据库加载成功！")
 
 }
 
 func executeRequestTask() {
-	executeRequestTaskStatus = true
-	ticker := time.NewTicker(1 * time.Second) // 创建一个每3秒触发一次的计时器
+	ticker := time.NewTicker(1 * time.Second)
 	executeRequestTaskStatus = true
 	if executeRequestTaskStatus {
 		fmt.Printf("区块同步任务加载完成!\n")
@@ -301,6 +301,14 @@ func executeRequestTask() {
 
 }
 
+func executeAccountTask() {
+	ticker := time.NewTicker(60 * time.Second) // 60s
+	for {
+		<-ticker.C // 等待计时器触发
+		synAccountTask()
+	}
+}
+
 func synAccountTask() {
 	sql := NewSQL()
 	// 查询所有 address
@@ -323,7 +331,7 @@ func synAccountTask() {
 		accounts = append(accounts, account)
 	}
 
-	// 更新 status
+	// 更新 account
 	for _, account := range accounts {
 		synUpdateAccount(account.Address)
 	}
@@ -334,7 +342,7 @@ func synUpdateAccount(address string) {
 	balance := synAccountBalcance(address)
 	cred := synAccountCred(address)
 	shareNum := sql.synAccountShareNum(address)
-	fmt.Printf("%v||%v||%v\n", balance, cred, shareNum)
+	// fmt.Printf("%v||%v||%v\n", balance, cred, shareNum)
 	_, err := sql.db.Exec("UPDATE bc_block_account SET balance = ?, cred = ?, share_num = ? WHERE address = ?",
 		balance, cred, shareNum, address)
 	if err != nil {

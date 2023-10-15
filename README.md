@@ -30,10 +30,11 @@ docker-compose up -d
 ### 运行：
 ```
 chmod +x ./bc_server
-nohup ./bc_server > service.log 2>&1 & echo $! > pidfile
+nohup ./bc_server > bc_service.log 2>&1 & echo $! > pidfile
 ```
 
 ### 停止：
 ```
+ps -ef | grep "bc_server"
 kill $(cat pidfile)
 ```
