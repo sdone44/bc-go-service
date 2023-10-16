@@ -323,17 +323,18 @@ func executeRequestTask() {
 
 func executeAccountTask() {
 	ticker := time.NewTicker(60 * time.Second) // 60s
+	sql := NewSQL()
 	for {
 		<-ticker.C // 等待计时器触发
-		synAccountTask()
+		sql.synAccountTask()
+		defer sql.db.Close()
 	}
 }
 
-func synAccountTask() {
-	sql := NewSQL()
+func (s *SQL) synAccountTask() {
 	// 查询所有 address
 	query := `SELECT address FROM bc_block_account`
-	rows, err := sql.db.Query(query)
+	rows, err := s.db.Query(query)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -353,22 +354,20 @@ func synAccountTask() {
 
 	// 更新 account
 	for _, account := range accounts {
-		synUpdateAccount(account.Address)
+		s.synUpdateAccount(account.Address)
 	}
 }
 
-func synUpdateAccount(address string) {
-	sql := NewSQL()
+func (s *SQL) synUpdateAccount(address string) {
 	balance := synAccountBalcance(address)
 	cred := synAccountCred(address)
-	shareNum := sql.synAccountShareNum(address)
+	shareNum := s.synAccountShareNum(address)
 	// fmt.Printf("%v||%v||%v\n", balance, cred, shareNum)
-	_, err := sql.db.Exec("UPDATE bc_block_account SET balance = ?, cred = ?, share_num = ? WHERE address = ?",
+	_, err := s.db.Exec("UPDATE bc_block_account SET balance = ?, cred = ?, share_num = ? WHERE address = ?",
 		balance, cred, shareNum, address)
 	if err != nil {
 		log.Fatal(err)
 	}
-	sql.db.Close()
 }
 
 func synAccountBalcance(address string) int64 {
