@@ -50,9 +50,9 @@ type Response struct {
 }
 
 type ResponseList struct {
-	Data QueryList `json:"data"`
-	Msg  string    `json:"msg"`
-	Code int       `json:"code"`
+	Data interface{} `json:"data"`
+	Msg  string      `json:"msg"`
+	Code int         `json:"code"`
 }
 
 type QueryList struct {
@@ -60,6 +60,13 @@ type QueryList struct {
 	Page     int                   `json:"page"`
 	PageSize int                   `json:"pagesize"`
 	Total    int                   `json:"total"`
+}
+
+type AccountQueryList struct {
+	List     []AccountResponse `json:"list"`
+	Page     int               `json:"page"`
+	PageSize int               `json:"pagesize"`
+	Total    int               `json:"total"`
 }
 
 type JSONRPCRequest struct {
@@ -121,6 +128,13 @@ type TransactionResponse struct {
 	// GasUsed     string `json:"gasUsed"`
 }
 
+type AccountResponse struct {
+	Address   string `json:"address"`
+	Balance   int    `json:"balance"`
+	Cred      int    `json:"cred"`
+	ShareNnum int    `json:"share_num"`
+}
+
 type SQL struct {
 	db *sql.DB
 }
@@ -136,6 +150,7 @@ func initListen() {
 	http.HandleFunc("/register", handleRequest)
 	http.HandleFunc("/contract-address", getContractAddress)
 	http.HandleFunc("/getTransByAddress", getTransByAddress)
+	http.HandleFunc("/accountRanking", accountRanking)
 	fmt.Printf("服务端口: %s\n", port)
 	fmt.Printf("当前Cred合约地址: %s\n", contractAddress)
 	err := http.ListenAndServe(":"+port, nil)
@@ -424,6 +439,7 @@ func synAccountBalcance(address string) int64 {
 		fmt.Println("Failed to unmarshal result field:", err)
 		panic(err)
 	}
+	// fmt.Printf("output is: %v\n", )
 
 	balance, err := strconv.ParseInt(balanceReceipt.Output[2:], 16, 64)
 	if err != nil {
@@ -688,8 +704,13 @@ func (s *SQL) synBlockTask(block_num int) {
 		_, err = s.db.Exec("INSERT INTO bc_block_transactions (block_num, trans_hash, `from`, `to`, input, decode_input, is_contract, method_id, import_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 			blockInfo.Number, tx.Hash, tx.From, tx.To, tx.Input, decode_input, is_contract, method_id, tx.ImportTime)
 		if err != nil {
-			fmt.Printf("区块[%v]交易存储失败：%v\n", blockInfo.Number, tx.Hash)
-			log.Fatal(err)
+			if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
+				// 错误代码 1062 表示唯一性约束错误
+				fmt.Printf("区块[%v]交易已存在：%v\n", blockInfo.Number, tx.Hash)
+			} else {
+				fmt.Printf("区块[%v]交易存储失败：%v\n", blockInfo.Number, tx.Hash)
+				log.Fatal(err)
+			}
 		}
 		s.synTransReceipt(tx.Hash)
 		go s.synAddAddress(tx.From)
@@ -1011,6 +1032,97 @@ func getTransByAddress(w http.ResponseWriter, r *http.Request) {
 	response := ResponseList{
 		Data: QueryList{
 			List:     transactions,
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
+		Msg:  "success",
+		Code: 1,
+	}
+
+	// 序列化 Response 结构为 JSON 字符串
+	responseJsonData, err := json.Marshal(response)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Error serializing JSON data")
+		return
+	}
+
+	// 设置响应头为 JSON 格式
+	w.Header().Set("Content-Type", "application/json")
+
+	// 发送响应
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseJsonData)
+
+}
+
+func accountRanking(w http.ResponseWriter, r *http.Request) {
+	// 获取请求参数
+	queryValues := r.URL.Query()
+	pageStr := queryValues.Get("page")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+	pageSizeStr := queryValues.Get("pagesize")
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
+	}
+	// 连接数据库
+	dsn := dbUsername + ":" + dbPassword + "@tcp" + "(" + dbHost + ":" + dbPort + ")/" + dbase
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Error connecting to database")
+		return
+	}
+	defer db.Close()
+
+	// 计算偏移量和限制条数
+	offset := (page - 1) * pageSize
+	limit := pageSize
+
+	// 执行查询
+	query := "SELECT address, balance, cred, share_num FROM bc_block_account ORDER BY balance DESC LIMIT ?, ?"
+	rows, err := db.Query(query, offset, limit)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Error querying database")
+		fmt.Println("Error", err)
+		return
+	}
+	defer rows.Close()
+
+	// 将查询结果映射为 Transaction 数据结构的列表
+	accounts := make([]AccountResponse, 0)
+	for rows.Next() {
+		account := AccountResponse{}
+		err := rows.Scan(&account.Address, &account.Balance, &account.Cred, &account.ShareNnum)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Error scanning row data")
+			fmt.Println("Error", err)
+			return
+		}
+		accounts = append(accounts, account)
+	}
+	// 获取总数
+	countQuery := "SELECT COUNT(*) FROM bc_block_account"
+	var total int
+	err = db.QueryRow(countQuery).Scan(&total)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Error querying total count")
+		fmt.Println("Error", err)
+		return
+	}
+
+	// 构建 Response 结构体
+	response := ResponseList{
+		Data: AccountQueryList{
+			List:     accounts,
 			Page:     page,
 			PageSize: pageSize,
 			Total:    total,
