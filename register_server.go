@@ -996,7 +996,7 @@ func getTransByAddress(w http.ResponseWriter, r *http.Request) {
 	limit := pageSize
 
 	// 执行查询
-	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, decode_input, decode_output, heart_rate, breath_rate, sleep_state FROM bc_block_transactions WHERE `from` = ? ORDER BY import_time DESC LIMIT ?, ?"
+	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, decode_input, decode_output, heart_rate, breath_rate, sleep_state FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
 	rows, err := db.Query(query, queryValues.Get("address"), offset, limit)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
