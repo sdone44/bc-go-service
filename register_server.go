@@ -56,10 +56,10 @@ type ResponseList struct {
 }
 
 type QueryList struct {
-	List     []TransactionResponse `json:"list"`
-	Page     int                   `json:"page"`
-	PageSize int                   `json:"pagesize"`
-	Total    int                   `json:"total"`
+	List     interface{} `json:"params"`
+	Page     int         `json:"page"`
+	PageSize int         `json:"pagesize"`
+	Total    int         `json:"total"`
 }
 
 type AccountQueryList struct {
@@ -126,9 +126,24 @@ type TransactionResponse struct {
 	HeartRate    string `json:"heart_rate"`
 	BreathRate   string `json:"breath_rate"`
 	SleepState   int    `json:"sleep_state"`
+	PersonId     int    `json:"person_id"`
 	// Input       string `json:"input"`
 	// Output      string `json:"output"`
 	// GasUsed     string `json:"gasUsed"`
+}
+
+type TransactionResResponse struct {
+	BlockNumber    string `json:"block_num"`
+	Hash           string `json:"trans_hash"`
+	From           string `json:"from"`
+	To             string `json:"to"`
+	Status         int    `json:"status"`
+	DecodeInput    string `json:"decode_input"`
+	DecodeOutput   string `json:"decode_output"`
+	ImportTime     int    `json:"import_time"`
+	HeartChange    string `json:"heart_change"`
+	SleepBreathing string `json:"sleep_breathing"`
+	PersonId       int    `json:"person_id"`
 }
 
 type AccountResponse struct {
@@ -153,6 +168,7 @@ func initListen() {
 	http.HandleFunc("/register", handleRequest)
 	http.HandleFunc("/contract-address", getContractAddress)
 	http.HandleFunc("/getTransByAddress", getTransByAddress)
+	http.HandleFunc("/getResByAddress", getResByAddress)
 	http.HandleFunc("/accountRanking", accountRanking)
 	fmt.Printf("服务端口: %s\n", port)
 	fmt.Printf("当前Cred合约地址: %s\n", contractAddress)
@@ -996,7 +1012,7 @@ func getTransByAddress(w http.ResponseWriter, r *http.Request) {
 	limit := pageSize
 
 	// 执行查询
-	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, decode_input, decode_output, heart_rate, breath_rate, sleep_state FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
+	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, decode_input, decode_output, heart_rate, breath_rate, sleep_state, person_id FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
 	rows, err := db.Query(query, queryValues.Get("address"), offset, limit)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1010,7 +1026,99 @@ func getTransByAddress(w http.ResponseWriter, r *http.Request) {
 	transactions := make([]TransactionResponse, 0)
 	for rows.Next() {
 		transaction := TransactionResponse{}
-		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.DecodeInput, &transaction.DecodeOutput, &transaction.HeartRate, &transaction.BreathRate, &transaction.SleepState)
+		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.DecodeInput, &transaction.DecodeOutput, &transaction.HeartRate, &transaction.BreathRate, &transaction.SleepState, &transaction.PersonId)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "Error scanning row data")
+			fmt.Println("Error", err)
+			return
+		}
+		transactions = append(transactions, transaction)
+	}
+	// 获取总数
+	countQuery := "SELECT COUNT(*) FROM bc_block_transactions WHERE `from` = ?"
+	var total int
+	err = db.QueryRow(countQuery, queryValues.Get("address")).Scan(&total)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Error querying total count")
+		fmt.Println("Error", err)
+		return
+	}
+
+	// 构建 Response 结构体
+	response := ResponseList{
+		Data: QueryList{
+			List:     transactions,
+			Page:     page,
+			PageSize: pageSize,
+			Total:    total,
+		},
+		Msg:  "success",
+		Code: 1,
+	}
+
+	// 序列化 Response 结构为 JSON 字符串
+	responseJsonData, err := json.Marshal(response)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Error serializing JSON data")
+		return
+	}
+
+	// 设置响应头为 JSON 格式
+	w.Header().Set("Content-Type", "application/json")
+
+	// 发送响应
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseJsonData)
+
+}
+
+func getResByAddress(w http.ResponseWriter, r *http.Request) {
+	// 获取请求参数
+	queryValues := r.URL.Query()
+	pageStr := queryValues.Get("page")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+	pageSizeStr := queryValues.Get("pagesize")
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
+	}
+	// 连接数据库
+	dsn := dbUsername + ":" + dbPassword + "@tcp" + "(" + dbHost + ":" + dbPort + ")/" + dbase
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Error connecting to database")
+		return
+	}
+	defer db.Close()
+
+	// 计算偏移量和限制条数
+	offset := (page - 1) * pageSize
+	limit := pageSize
+
+	// 执行查询
+
+	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, decode_input, decode_output, sleep_breathing, heart_change, person_id FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
+	rows, err := db.Query(query, queryValues.Get("address"), offset, limit)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Error querying database")
+		fmt.Println("Error", err)
+		return
+	}
+	defer rows.Close()
+
+	// 将查询结果映射为 Transaction 数据结构的列表
+	transactions := make([]TransactionResResponse, 0)
+	for rows.Next() {
+		transaction := TransactionResResponse{}
+		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.DecodeInput, &transaction.DecodeOutput, &transaction.SleepBreathing, &transaction.HeartChange, &transaction.PersonId)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "Error scanning row data")
