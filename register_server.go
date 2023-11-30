@@ -115,18 +115,20 @@ type TransactionReceipt struct {
 }
 
 type TransactionResponse struct {
-	BlockNumber  string `json:"block_num"`
-	Hash         string `json:"trans_hash"`
-	From         string `json:"from"`
-	To           string `json:"to"`
-	Status       int    `json:"status"`
-	DecodeInput  string `json:"decode_input"`
-	DecodeOutput string `json:"decode_output"`
-	ImportTime   int    `json:"import_time"`
-	HeartRate    string `json:"heart_rate"`
-	BreathRate   string `json:"breath_rate"`
-	SleepState   int    `json:"sleep_state"`
-	PersonId     int    `json:"person_id"`
+	BlockNumber string `json:"block_num"`
+	Hash        string `json:"trans_hash"`
+	From        string `json:"from"`
+	To          string `json:"to"`
+	Status      int    `json:"status"`
+	// DecodeInput  string `json:"decode_input"`
+	// DecodeOutput string `json:"decode_output"`
+	Input      string `json:"input"`
+	Output     string `json:"output"`
+	ImportTime int    `json:"import_time"`
+	HeartRate  string `json:"heart_rate"`
+	BreathRate string `json:"breath_rate"`
+	SleepState int    `json:"sleep_state"`
+	PersonId   int    `json:"person_id"`
 	// Input       string `json:"input"`
 	// Output      string `json:"output"`
 	// GasUsed     string `json:"gasUsed"`
@@ -138,8 +140,8 @@ type TransactionResResponse struct {
 	From           string `json:"from"`
 	To             string `json:"to"`
 	Status         int    `json:"status"`
-	DecodeInput    string `json:"decode_input"`
-	DecodeOutput   string `json:"decode_output"`
+	Input          string `json:"input"`
+	Output         string `json:"output"`
 	ImportTime     int    `json:"import_time"`
 	HeartChange    string `json:"heart_change"`
 	SleepBreathing string `json:"sleep_breathing"`
@@ -1012,7 +1014,7 @@ func getTransByAddress(w http.ResponseWriter, r *http.Request) {
 	limit := pageSize
 
 	// 执行查询
-	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, decode_input, decode_output, heart_rate, breath_rate, sleep_state, person_id FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
+	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, input, output, heart_rate, breath_rate, sleep_state, person_id FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
 	rows, err := db.Query(query, queryValues.Get("address"), offset, limit)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1026,7 +1028,7 @@ func getTransByAddress(w http.ResponseWriter, r *http.Request) {
 	transactions := make([]TransactionResponse, 0)
 	for rows.Next() {
 		transaction := TransactionResponse{}
-		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.DecodeInput, &transaction.DecodeOutput, &transaction.HeartRate, &transaction.BreathRate, &transaction.SleepState, &transaction.PersonId)
+		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.Input, &transaction.Output, &transaction.HeartRate, &transaction.BreathRate, &transaction.SleepState, &transaction.PersonId)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "Error scanning row data")
@@ -1104,7 +1106,7 @@ func getResByAddress(w http.ResponseWriter, r *http.Request) {
 
 	// 执行查询
 
-	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, decode_input, decode_output, sleep_breathing, heart_change, person_id FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
+	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, input, output, sleep_breathing, heart_change, person_id FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
 	rows, err := db.Query(query, queryValues.Get("address"), offset, limit)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1118,7 +1120,7 @@ func getResByAddress(w http.ResponseWriter, r *http.Request) {
 	transactions := make([]TransactionResResponse, 0)
 	for rows.Next() {
 		transaction := TransactionResResponse{}
-		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.DecodeInput, &transaction.DecodeOutput, &transaction.SleepBreathing, &transaction.HeartChange, &transaction.PersonId)
+		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.Input, &transaction.Output, &transaction.SleepBreathing, &transaction.HeartChange, &transaction.PersonId)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "Error scanning row data")
