@@ -37,6 +37,7 @@ var (
 	dbHost                   string
 	rpcUrl                   string
 	accountTaskStatus        string
+	pullTaskStatus           string
 )
 
 type Input struct {
@@ -185,7 +186,9 @@ func initBlockTask() {
 	fmt.Printf("加载区块同步任务...\n")
 	executeRequestTaskStatus = false
 	// 启动异步任务
-	go executeRequestTask()
+	if pullTaskStatus == "on" {
+		go executeRequestTask()
+	}
 	if accountTaskStatus == "on" {
 		go executeAccountTask()
 	}
@@ -209,6 +212,7 @@ func initEnvConfig() {
 	contractAddress = os.Getenv("CONTRACT_ADDRESS")
 	contractMethodId = os.Getenv("CONTRACT_METHOD_SHARADATE")
 	accountTaskStatus = os.Getenv("ACCOUNT_TASK_STATUS")
+	pullTaskStatus = os.Getenv("PULL_TASK_STATUS")
 	if port == "" {
 		port = "5924" // 当未在 .env 文件中指定 PORT 时，默认使用 5000
 	}
