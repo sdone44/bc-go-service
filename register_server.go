@@ -133,6 +133,8 @@ type TransactionResponse struct {
 	// Input       string `json:"input"`
 	// Output      string `json:"output"`
 	// GasUsed     string `json:"gasUsed"`
+	ContactName     string `json:"contact_name"`
+	ContactIdentity string `json:"contact_identity"`
 }
 
 type TransactionResResponse struct {
@@ -1018,7 +1020,7 @@ func getTransByAddress(w http.ResponseWriter, r *http.Request) {
 	limit := pageSize
 
 	// 执行查询
-	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, input, output, heart_rate, breath_rate, sleep_state, person_id FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
+	query := "SELECT block_num, trans_hash, `from`, `to`, `status`, import_time, input, output, heart_rate, breath_rate, sleep_state, person_id, contact_name, contact_identity FROM bc_block_transactions WHERE `from` = ? ORDER BY id DESC LIMIT ?, ?"
 	rows, err := db.Query(query, queryValues.Get("address"), offset, limit)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1032,7 +1034,7 @@ func getTransByAddress(w http.ResponseWriter, r *http.Request) {
 	transactions := make([]TransactionResponse, 0)
 	for rows.Next() {
 		transaction := TransactionResponse{}
-		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.Input, &transaction.Output, &transaction.HeartRate, &transaction.BreathRate, &transaction.SleepState, &transaction.PersonId)
+		err := rows.Scan(&transaction.BlockNumber, &transaction.Hash, &transaction.From, &transaction.To, &transaction.Status, &transaction.ImportTime, &transaction.Input, &transaction.Output, &transaction.HeartRate, &transaction.BreathRate, &transaction.SleepState, &transaction.PersonId, &transaction.ContactName, &transaction.ContactIdentity)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "Error scanning row data")
